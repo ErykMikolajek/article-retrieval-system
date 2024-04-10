@@ -6,25 +6,8 @@ from langchain.prompts import PromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.chains import LLMChain
 
-from typing import Any
-from uuid import UUID
-from tqdm.auto import tqdm
-from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.outputs import LLMResult
-
 import warnings
 warnings.simplefilter('ignore')
-
-
-class BatchCallback(BaseCallbackHandler):
-    def __init__(self, total: int):
-        super().__init__()
-        self.count = 0
-        self.progress_bar = tqdm(total=total, desc="Generating tokens")
-
-    def on_llm_end(self, response: LLMResult, *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any):
-        self.count += 1
-        self.progress_bar.update(1)
 
 
 class RetrievalModel:
@@ -33,7 +16,7 @@ class RetrievalModel:
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.database_path = database_path
-        self.vector_db = self.load_vector_db()
+        self.vector_db = generate_database(self.database_path)
         self.max_tokens = max_tokens
 
         self.text_generation_pipeline = self.setup_text_generation_pipeline()
@@ -57,32 +40,31 @@ class RetrievalModel:
 
     def setup_prompt_template(self):
         prompt_template = """
-        [INST]
+        [INST] 
         Answer the question based on the following context:
-        {context}
+        {% for doc in context %}
+        {{ doc.page_content }}
+        {% endfor %}
         [/INST]
 
         Question:
-        {question} 
+        {{question}}
         """
         return PromptTemplate(
             input_variables=["context", "question"],
             template=prompt_template,
+            template_format="jinja2"
         )
 
     def setup_llm_chain(self):
         return LLMChain(llm=self.mistral_llm, prompt=self.prompt)
 
-    def load_vector_db(self):
-        return generate_database(self.database_path)
-
     def get_answer(self, local_query):
-        # cb = BatchCallback(len(local_query))
         print("Generating response:")
         if self.vector_db:
             retriever = self.vector_db.as_retriever(
                 search_type="similarity",
-                search_kwargs={'k': 1}
+                search_kwargs={'k': 3}
             )
             rag_chain = (
                     {"context": retriever, "question": RunnablePassthrough()}
@@ -92,17 +74,18 @@ class RetrievalModel:
         else:
             response = self.llm_chain.run(local_query)
 
-        # cb.progress_bar.close()
         return response
 
 
 if __name__ == '__main__':
-    # name = 'TinyLlama/TinyLlama-1.1B-Chat-v1.0'
     name = '../tiny_llama'
     # name = '../mistral_model'
-    model = RetrievalModel(name, max_tokens=20)
-    query = "Tell me about Transformers."
+    model = RetrievalModel(name, max_tokens=1000)
+    query = "How does word2vec work?"
     answer = model.get_answer(query)
-    print(answer)
+    print("Question:", answer["question"])
+    print(answer['text'])
+
+
 
 
