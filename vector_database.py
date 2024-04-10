@@ -11,7 +11,7 @@ def generate_database(file_path: str, embeddings_model_name: str = 'sentence-tra
     print("Loading database:")
     embeddings = HuggingFaceEmbeddings(model_name=embeddings_model_name)
     try:
-        vector_db = FAISS.load_local(local_path, embeddings)
+        vector_db = FAISS.load_local(local_path, embeddings, allow_dangerous_deserialization=True)
         print('Vector database loaded successfully')
     except Exception as e:
         vector_db = None
@@ -27,7 +27,6 @@ def generate_database(file_path: str, embeddings_model_name: str = 'sentence-tra
             chunk_overlap=24
         )
         chunked_documents = text_splitter.split_documents(data)
-        chunked_documents = chunked_documents[:2]
         with tqdm(total=len(chunked_documents), desc="Indexing documents") as pbar:
             for doc in chunked_documents:
                 if vector_db:
