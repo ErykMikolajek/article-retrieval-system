@@ -11,7 +11,7 @@ warnings.simplefilter('ignore')
 
 
 class RetrievalModel:
-    def __init__(self, model_name, database_path='articles_indexed', max_tokens=100):
+    def __init__(self, model_name, database_path='medium.csv', max_tokens=1000):
         print("Loading model:")
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
